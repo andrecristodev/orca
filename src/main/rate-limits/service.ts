@@ -21,6 +21,7 @@ import {
 } from '../claude-accounts/runtime-selection'
 import { fetchGeminiRateLimits } from './gemini-usage-fetcher'
 import { fetchKimiRateLimits } from './kimi-fetcher'
+import { fetchAntigravityRateLimits } from './antigravity-fetcher'
 import { hasMiniMaxSessionCookie } from '../minimax/minimax-cookie-store'
 import { fetchMiniMaxRateLimits } from './minimax-fetcher'
 import { fetchOpenCodeGoRateLimits } from './opencode-go-usage-fetcher'
@@ -78,6 +79,7 @@ type InternalRateLimitState = {
   opencodeGo: ProviderRateLimits | null
   kimi: ProviderRateLimits | null
   minimax: ProviderRateLimits | null
+  antigravity: ProviderRateLimits | null
 }
 
 function normalizePollingInterval(ms: number): number {
@@ -110,7 +112,8 @@ export class RateLimitService {
     gemini: null,
     opencodeGo: null,
     kimi: null,
-    minimax: null
+    minimax: null,
+    antigravity: null
   }
   private pollInterval: number = DEFAULT_POLL_MS
   private timer: ReturnType<typeof setInterval> | null = null
@@ -1025,7 +1028,7 @@ export class RateLimitService {
 
   private withFetchingStatus(
     current: ProviderRateLimits | null,
-    provider: 'claude' | 'codex' | 'gemini' | 'opencode-go' | 'kimi' | 'minimax'
+    provider: 'claude' | 'codex' | 'gemini' | 'opencode-go' | 'kimi' | 'minimax' | 'antigravity'
   ): ProviderRateLimits {
     if (!current) {
       return {
@@ -1097,38 +1100,47 @@ export class RateLimitService {
       kimi: this.withFetchingStatus(previousState.kimi, 'kimi'),
       minimax: miniMaxConfigChanged
         ? this.withFetchingStatus(null, 'minimax')
-        : this.withFetchingStatus(previousState.minimax, 'minimax')
+        : this.withFetchingStatus(previousState.minimax, 'minimax'),
+      antigravity: this.withFetchingStatus(previousState.antigravity, 'antigravity')
     })
 
     const missingWslCodexHome = codexHomePath
       ? null
       : this.getMissingWslCodexHomeResult(codexTarget)
-    const [claudeResult, codexResult, geminiResult, opencodeGoResult, kimiResult, miniMaxResult] =
-      await Promise.allSettled([
-        fetchClaudeRateLimits({
-          authPreparation: claudeAuthPreparation,
-          allowPtyFallback: this.shouldAllowClaudePtyFallback(claudeAuthPreparation),
-          allowUsagePanelSupplement: this.shouldAllowClaudeUsagePanelSupplement(),
-          networkProxySettings: this.networkProxySettingsResolver?.(),
+    const [
+      claudeResult,
+      codexResult,
+      geminiResult,
+      opencodeGoResult,
+      kimiResult,
+      miniMaxResult,
+      antigravityResult
+    ] = await Promise.allSettled([
+      fetchClaudeRateLimits({
+        authPreparation: claudeAuthPreparation,
+        allowPtyFallback: this.shouldAllowClaudePtyFallback(claudeAuthPreparation),
+        allowUsagePanelSupplement: this.shouldAllowClaudeUsagePanelSupplement(),
+        networkProxySettings: this.networkProxySettingsResolver?.(),
+        signal
+      }),
+      missingWslCodexHome ??
+        fetchCodexRateLimits({
+          codexHomePath,
+          allowPtyFallback: this.shouldAllowCodexPtyFallback(),
           signal
         }),
-        missingWslCodexHome ??
-          fetchCodexRateLimits({
-            codexHomePath,
-            allowPtyFallback: this.shouldAllowCodexPtyFallback(),
-            signal
+      fetchGeminiRateLimits(geminiCliOAuthEnabled),
+      fetchOpenCodeGoRateLimits(cookie, workspaceIdOverride || undefined),
+      fetchKimiRateLimits(),
+      miniMaxConfigResult.error
+        ? Promise.resolve(this.getMiniMaxCredentialError(miniMaxConfigResult.error))
+        : fetchMiniMaxRateLimits({
+            cookie: miniMaxCookie,
+            groupId: miniMaxGroupId,
+            models: miniMaxModels
           }),
-        fetchGeminiRateLimits(geminiCliOAuthEnabled),
-        fetchOpenCodeGoRateLimits(cookie, workspaceIdOverride || undefined),
-        fetchKimiRateLimits(),
-        miniMaxConfigResult.error
-          ? Promise.resolve(this.getMiniMaxCredentialError(miniMaxConfigResult.error))
-          : fetchMiniMaxRateLimits({
-              cookie: miniMaxCookie,
-              groupId: miniMaxGroupId,
-              models: miniMaxModels
-            })
-      ])
+      fetchAntigravityRateLimits()
+    ])
 
     if (signal.aborted) {
       return
@@ -1216,6 +1228,21 @@ export class RateLimitService {
             status: 'error'
           } satisfies ProviderRateLimits)
 
+    const antigravity =
+      antigravityResult.status === 'fulfilled'
+        ? antigravityResult.value
+        : ({
+            provider: 'antigravity',
+            session: null,
+            weekly: null,
+            updatedAt: Date.now(),
+            error:
+              antigravityResult.reason instanceof Error
+                ? antigravityResult.reason.message
+                : 'Unknown error',
+            status: 'error'
+          } satisfies ProviderRateLimits)
+
     const latestCodexHomePath = this.codexHomePathResolver?.(codexTarget) ?? null
     const latestClaudeAuthPreparation = await this.claudeAuthPreparationResolver?.(claudeTarget)
     if (signal.aborted) {
@@ -1255,7 +1282,8 @@ export class RateLimitService {
         ? miniMaxConfigChanged
           ? miniMax
           : this.applyStalePolicy(miniMax, previousState.minimax)
-        : this.state.minimax
+        : this.state.minimax,
+      antigravity: this.applyStalePolicy(antigravity, previousState.antigravity)
     })
 
     this.lastFetchAt = Date.now()

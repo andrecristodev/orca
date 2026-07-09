@@ -20,6 +20,9 @@ export function getProviderDisplayName(provider: ProviderRateLimits['provider'])
   if (provider === 'minimax') {
     return 'MiniMax'
   }
+  if (provider === 'antigravity') {
+    return 'Antigravity'
+  }
   return provider
 }
 

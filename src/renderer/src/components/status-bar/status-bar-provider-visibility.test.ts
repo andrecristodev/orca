@@ -271,7 +271,8 @@ describe('isUsageEmptyState', () => {
           gemini: null,
           opencodeGo: null,
           kimi: null,
-          minimax: null
+          minimax: null,
+          antigravity: null
         },
         usageSettings()
       )
@@ -287,7 +288,8 @@ describe('isUsageEmptyState', () => {
           gemini: provider('unavailable'),
           opencodeGo: provider('unavailable', { provider: 'opencode-go' }),
           kimi: provider('unavailable', { provider: 'kimi' }),
-          minimax: provider('unavailable', { provider: 'minimax' })
+          minimax: provider('unavailable', { provider: 'minimax' }),
+          antigravity: provider('unavailable', { provider: 'antigravity' })
         },
         usageSettings()
       )
@@ -303,7 +305,8 @@ describe('isUsageEmptyState', () => {
           gemini: provider('unavailable'),
           opencodeGo: provider('unavailable', { provider: 'opencode-go' }),
           kimi: provider('unavailable', { provider: 'kimi' }),
-          minimax: provider('unavailable', { provider: 'minimax' })
+          minimax: provider('unavailable', { provider: 'minimax' }),
+          antigravity: provider('unavailable', { provider: 'antigravity' })
         },
         usageSettings({
           codexManagedAccounts: [
@@ -330,7 +333,8 @@ describe('isUsageEmptyState', () => {
           gemini: null,
           opencodeGo: null,
           kimi: null,
-          minimax: null
+          minimax: null,
+          antigravity: null
         },
         null
       )
@@ -346,7 +350,8 @@ describe('isUsageEmptyState', () => {
           gemini: provider('unavailable'),
           opencodeGo: provider('unavailable', { provider: 'opencode-go' }),
           kimi: provider('unavailable', { provider: 'kimi' }),
-          minimax: provider('unavailable', { provider: 'minimax' })
+          minimax: provider('unavailable', { provider: 'minimax' }),
+          antigravity: provider('unavailable', { provider: 'antigravity' })
         },
         usageSettings()
       )

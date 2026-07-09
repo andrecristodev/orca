@@ -1692,7 +1692,9 @@ export function ProviderDetailsMenu({
                         ? 'K'
                         : provider.provider === 'minimax'
                           ? 'M'
-                          : 'X'}
+                          : provider.provider === 'antigravity'
+                            ? 'A'
+                            : 'X'}
               </span>
             </span>
           ) : (
@@ -1838,7 +1840,7 @@ function StatusBarInner({ floatingTerminalOpen }: StatusBarProps): React.JSX.Ele
     return null
   }
 
-  const { claude, codex, gemini, opencodeGo, kimi, minimax } = rateLimits
+  const { claude, codex, gemini, opencodeGo, kimi, minimax, antigravity } = rateLimits
 
   // Why: a provider earns a bar from either a usable live snapshot or durable
   // setup in Settings. The durable path keeps account switchers visible while
@@ -1853,6 +1855,7 @@ function StatusBarInner({ floatingTerminalOpen }: StatusBarProps): React.JSX.Ele
   const visibleGemini = getVisibleUsageProvider('gemini', gemini, usageSettings)
   const visibleKimi = getVisibleUsageProvider('kimi', kimi, usageSettings)
   const visibleMiniMax = getVisibleUsageProvider('minimax', minimax, usageSettings)
+  const visibleAntigravity = getVisibleUsageProvider('antigravity', antigravity, usageSettings)
   const showClaude =
     visibleClaude !== null &&
     statusBarItems.includes('claude') &&
@@ -1869,6 +1872,12 @@ function StatusBarInner({ floatingTerminalOpen }: StatusBarProps): React.JSX.Ele
     visibleKimi !== null &&
     statusBarItems.includes('kimi') &&
     isStatusBarItemAvailable('kimi', detectedAgentIds)
+  // Why: Antigravity's `agy` CLI is detected on PATH, so it is detection-gated
+  // like the other per-CLI bars (Claude/Codex/Gemini/Kimi).
+  const showAntigravity =
+    visibleAntigravity !== null &&
+    statusBarItems.includes('antigravity') &&
+    isStatusBarItemAvailable('antigravity', detectedAgentIds)
   // Why: MiniMax is a cookie-auth provider, not a CLI on PATH, so detection-gating
   // doesn't apply (same rationale as OpenCode Go below).
   const showMiniMax = visibleMiniMax !== null && statusBarItems.includes('minimax')
@@ -1888,13 +1897,14 @@ function StatusBarInner({ floatingTerminalOpen }: StatusBarProps): React.JSX.Ele
     showOpencodeGo ||
     showKimi ||
     showMiniMax ||
+    showAntigravity ||
     showResourceUsage
   // Why: a brand-new user with no provider configured would otherwise see an
   // empty left side of the status bar and wonder what's missing. Settings are
   // included because managed accounts are durable even when live usage
   // snapshots are still hydrating or unavailable after an update.
   const isEmptyUsageState = isUsageEmptyState(
-    { claude, codex, gemini, opencodeGo, kimi, minimax },
+    { claude, codex, gemini, opencodeGo, kimi, minimax, antigravity },
     usageSettings
   )
   // Why: the teaching CTA is a one-time nudge — once the user hides it, keep it
@@ -1906,7 +1916,8 @@ function StatusBarInner({ floatingTerminalOpen }: StatusBarProps): React.JSX.Ele
     gemini?.status === 'fetching' ||
     opencodeGo?.status === 'fetching' ||
     kimi?.status === 'fetching' ||
-    minimax?.status === 'fetching'
+    minimax?.status === 'fetching' ||
+    antigravity?.status === 'fetching'
 
   const compact = containerWidth < 900
   const iconOnly = containerWidth < 500
@@ -1992,6 +2003,17 @@ function StatusBarInner({ floatingTerminalOpen }: StatusBarProps): React.JSX.Ele
                 ariaLabel={translate(
                   'auto.components.status.bar.StatusBar.06741a2f3d',
                   'Open MiniMax usage details'
+                )}
+              />
+            )}
+            {showAntigravity && (
+              <ProviderDetailsMenu
+                provider={visibleAntigravity}
+                compact={compact}
+                iconOnly={iconOnly}
+                ariaLabel={translate(
+                  'auto.components.status.bar.StatusBar.a9f1c3b2e7',
+                  'Open Antigravity usage details'
                 )}
               />
             )}
@@ -2148,6 +2170,18 @@ function StatusBarInner({ floatingTerminalOpen }: StatusBarProps): React.JSX.Ele
             <MiniMaxIcon size={14} />
             {translate('auto.components.status.bar.StatusBar.3bbf140864', 'MiniMax Usage')}
           </DropdownMenuCheckboxItem>
+          {isStatusBarItemAvailable('antigravity', detectedAgentIds) && (
+            <DropdownMenuCheckboxItem
+              checked={statusBarItems.includes('antigravity')}
+              onCheckedChange={() => {
+                recordFeatureInteraction('usage-tracking')
+                toggleStatusBarItem('antigravity')
+              }}
+            >
+              <AgentIcon agent="antigravity" size={14} />
+              {translate('auto.components.status.bar.StatusBar.b7e2a4c9d1', 'Antigravity Usage')}
+            </DropdownMenuCheckboxItem>
+          )}
           <DropdownMenuCheckboxItem
             checked={statusBarItems.includes('ssh')}
             onCheckedChange={() => {

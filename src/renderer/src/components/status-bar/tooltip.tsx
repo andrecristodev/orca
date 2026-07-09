@@ -96,6 +96,9 @@ export function ProviderIcon({ provider }: { provider: string }): React.JSX.Elem
   if (provider === 'minimax') {
     return <MiniMaxIcon size={13} />
   }
+  if (provider === 'antigravity') {
+    return <AgentIcon agent="antigravity" size={13} />
+  }
   return <ClaudeIcon size={13} />
 }
 

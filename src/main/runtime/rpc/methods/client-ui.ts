@@ -47,6 +47,7 @@ const StatusBarItem = z.enum([
   'opencode-go',
   'kimi',
   'minimax',
+  'antigravity',
   'ssh',
   'resource-usage',
   'ports'
@@ -203,6 +204,7 @@ const UiUpdate = z
     _portsStatusBarDefaultAdded: z.boolean().optional(),
     _kimiStatusBarDefaultAdded: z.boolean().optional(),
     _minimaxStatusBarDefaultAdded: z.boolean().optional(),
+    _antigravityStatusBarDefaultAdded: z.boolean().optional(),
     statusBarVisible: z.boolean().optional(),
     dismissedUpdateVersion: NullableString.optional(),
     lastUpdateCheckAt: z.number().finite().nullable().optional(),
