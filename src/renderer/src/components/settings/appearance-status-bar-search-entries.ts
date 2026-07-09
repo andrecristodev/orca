@@ -200,11 +200,11 @@ export function buildStatusBarToggleEntries(): readonly StatusBarToggleEntry[] {
     {
       id: 'antigravity',
       title: translate(
-        'auto.components.settings.appearance.search.antigravityTitle',
+        'auto.components.settings.appearance.search.aa6f637237',
         'Antigravity Usage'
       ),
       description: translate(
-        'auto.components.settings.appearance.search.antigravityDescription',
+        'auto.components.settings.appearance.search.69e81045ec',
         'Show Antigravity subscription usage in the status bar.'
       ),
       keywords: [
@@ -213,7 +213,7 @@ export function buildStatusBarToggleEntries(): readonly StatusBarToggleEntry[] {
           'status bar'
         ),
         ...translateSearchKeyword(
-          'auto.components.settings.appearance.search.antigravityKeyword',
+          'auto.components.settings.appearance.search.2ee1626b59',
           'antigravity'
         ),
         ...translateSearchKeyword('auto.components.settings.appearance.search.00a028f25f', 'usage'),
@@ -221,10 +221,8 @@ export function buildStatusBarToggleEntries(): readonly StatusBarToggleEntry[] {
           'auto.components.settings.appearance.search.de586def95',
           'subscription'
         ),
-        ...translateSearchKeyword(
-          'auto.components.settings.appearance.search.antigravityGoogleKeyword',
-          'google'
-        )
+        // Reuse the existing shared "google" keyword key instead of a duplicate.
+        ...translateSearchKeyword('auto.components.settings.appearance.search.51b0ccd6a2', 'google')
       ],
       toggleDescription: translate(
         'settings.appearance.statusBar.antigravityToggleDescription',

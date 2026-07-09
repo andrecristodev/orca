@@ -2975,8 +2975,8 @@
             "c0e972d726": "취소",
             "06741a2f3d": "MiniMax 사용량 세부 정보 열기",
             "3bbf140864": "MiniMax 사용량",
-            "a9f1c3b2e7": "Open Antigravity usage details",
-            "b7e2a4c9d1": "Antigravity Usage"
+            "97d40905ff": "Open Antigravity usage details",
+            "fc54bb062c": "Antigravity Usage"
           },
           "StatusBarUsageEmptyCta": {
             "828c764a79": "계정 연결",
@@ -7072,8 +7072,8 @@
               "workspaceOptions": "워크스페이스 옵션",
               "detailed": "상세"
             },
-            "antigravityTitle": "Antigravity Usage",
-            "antigravityDescription": "Show Antigravity subscription usage in the status bar."
+            "aa6f637237": "Antigravity Usage",
+            "69e81045ec": "Show Antigravity subscription usage in the status bar."
           }
         },
         "auto": {

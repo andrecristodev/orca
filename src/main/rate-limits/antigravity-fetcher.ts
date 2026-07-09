@@ -39,6 +39,7 @@ const ANTIGRAVITY_METADATA = {
 
 type ModelQuota = { remainingFraction: number; resetTime: string; modelId: string }
 
+/** Build an `unavailable` result — the provider is not configured (no credentials). */
 function unavailable(error: string): ProviderRateLimits {
   return {
     provider: 'antigravity',
@@ -50,6 +51,7 @@ function unavailable(error: string): ProviderRateLimits {
   }
 }
 
+/** Build an `error` result — a configured provider that failed transiently. */
 function failed(error: string): ProviderRateLimits {
   return {
     provider: 'antigravity',
@@ -61,6 +63,7 @@ function failed(error: string): ProviderRateLimits {
   }
 }
 
+/** POST a JSON body to a Code Assist endpoint with the Antigravity Bearer auth headers. */
 async function postJson(url: string, accessToken: string, body: unknown): Promise<Response> {
   return net.fetch(url, {
     method: 'POST',
@@ -76,8 +79,11 @@ async function postJson(url: string, accessToken: string, body: unknown): Promis
   })
 }
 
-// Why: `cloudaicompanionProject` comes back either as a bare string or as a
-// `{ value: string }` reference depending on the account's onboarding state.
+/**
+ * Extract the Code Assist project id from `cloudaicompanionProject`, which
+ * comes back either as a bare string or a `{ value: string }` reference
+ * depending on the account's onboarding state.
+ */
 function extractProjectId(value: unknown): string {
   if (typeof value === 'string') {
     return value.trim()
@@ -89,6 +95,7 @@ function extractProjectId(value: unknown): string {
   return ''
 }
 
+/** Resolve the Code Assist project id via `loadCodeAssist` under the ANTIGRAVITY ideType. */
 async function loadProjectId(accessToken: string): Promise<string> {
   const res = await postJson(LOAD_CODE_ASSIST_URL, accessToken, { metadata: ANTIGRAVITY_METADATA })
   if (!res.ok) {
@@ -98,12 +105,16 @@ async function loadProjectId(accessToken: string): Promise<string> {
   return extractProjectId(data.cloudaicompanionProject)
 }
 
+/** Type guard for a finite number (rejects NaN/Infinity and non-numbers). */
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value)
 }
 
-// Primary source: fetchAvailableModels returns a `{ models: { <id>: { quotaInfo } } }`
-// map, which is Antigravity's live per-model quota view.
+/**
+ * Parse the primary usage source: `fetchAvailableModels` returns a
+ * `{ models: { <id>: { quotaInfo: { remainingFraction, resetTime } } } }` map,
+ * Antigravity's live per-model quota view. Skips entries without usable quota.
+ */
 function parseModelQuotas(data: unknown): ModelQuota[] {
   if (!data || typeof data !== 'object' || !('models' in data)) {
     return []
@@ -132,7 +143,7 @@ function parseModelQuotas(data: unknown): ModelQuota[] {
   return quotas
 }
 
-// Fallback source: retrieveUserQuota returns a `{ buckets: [...] }` array.
+/** Parse the fallback usage source: `retrieveUserQuota` returns a `{ buckets: [...] }` array. */
 function parseQuotaBuckets(data: unknown): ModelQuota[] {
   let rawBuckets: unknown[] = []
   if (data && typeof data === 'object' && 'buckets' in data && Array.isArray(data.buckets)) {
@@ -159,6 +170,11 @@ function parseQuotaBuckets(data: unknown): ModelQuota[] {
   return quotas
 }
 
+/**
+ * Fetch per-model quotas, preferring `fetchAvailableModels` and falling back to
+ * `retrieveUserQuota` when the former is empty or errors. Throws
+ * `UnauthorizedError` on 401 so the caller can refresh and retry once.
+ */
 async function fetchModelQuotas(accessToken: string, projectId: string): Promise<ModelQuota[]> {
   const body = projectId ? { project: projectId } : {}
   const modelsRes = await postJson(FETCH_AVAILABLE_MODELS_URL, accessToken, body)
@@ -182,6 +198,7 @@ async function fetchModelQuotas(accessToken: string, projectId: string): Promise
   return parseQuotaBuckets(await quotaRes.json())
 }
 
+/** Internal sentinel thrown on an HTTP 401 to trigger a single refresh + retry. */
 class UnauthorizedError extends Error {
   constructor() {
     super('Antigravity request unauthorized (HTTP 401)')
@@ -189,6 +206,10 @@ class UnauthorizedError extends Error {
   }
 }
 
+/**
+ * Map parsed model quotas into a `ProviderRateLimits`, deduplicating buckets and
+ * summarizing the most-constrained one as the session window. Empty → `error`.
+ */
 function toRateLimits(quotas: ModelQuota[]): ProviderRateLimits {
   const buckets: RateLimitBucket[] = deduplicateBuckets(
     quotas.map((q) => ({ ...buildRateLimitBucket(q), modelId: q.modelId }))
@@ -207,6 +228,11 @@ function toRateLimits(quotas: ModelQuota[]): ProviderRateLimits {
   }
 }
 
+/**
+ * Return a usable access token: the stored one if unexpired, otherwise a fresh
+ * one minted in memory via the Gemini CLI OAuth client. Never persisted — see
+ * the inline note on why we don't rewrite the credential store.
+ */
 async function resolveAccessToken(creds: GeminiCredentials): Promise<string | null> {
   if (creds.expiry_date >= Date.now() && creds.access_token) {
     return creds.access_token

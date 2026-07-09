@@ -2975,8 +2975,8 @@
             "c0e972d726": "取消",
             "06741a2f3d": "打开 MiniMax 使用量详情",
             "3bbf140864": "MiniMax 使用量",
-            "a9f1c3b2e7": "Open Antigravity usage details",
-            "b7e2a4c9d1": "Antigravity Usage"
+            "97d40905ff": "Open Antigravity usage details",
+            "fc54bb062c": "Antigravity Usage"
           },
           "StatusBarUsageEmptyCta": {
             "828c764a79": "连接账户",
@@ -7072,8 +7072,8 @@
             },
             "9a115966d3": "关闭时最小化到托盘",
             "4d5b9427b5": "启用后，关闭窗口会让 Orca 继续在系统托盘中运行，而不是退出。",
-            "antigravityTitle": "Antigravity Usage",
-            "antigravityDescription": "Show Antigravity subscription usage in the status bar."
+            "aa6f637237": "Antigravity Usage",
+            "69e81045ec": "Show Antigravity subscription usage in the status bar."
           }
         },
         "auto": {

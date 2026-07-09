@@ -2975,8 +2975,8 @@
             "c0e972d726": "キャンセル",
             "06741a2f3d": "MiniMax の使用量詳細を開く",
             "3bbf140864": "MiniMax 使用量",
-            "a9f1c3b2e7": "Open Antigravity usage details",
-            "b7e2a4c9d1": "Antigravity Usage"
+            "97d40905ff": "Open Antigravity usage details",
+            "fc54bb062c": "Antigravity Usage"
           },
           "StatusBarUsageEmptyCta": {
             "828c764a79": "アカウントを接続する",
@@ -7109,8 +7109,8 @@
             },
             "9a115966d3": "閉じるときにトレイへ最小化",
             "4d5b9427b5": "有効にすると、ウィンドウを閉じてもOrcaは終了せず、システムトレイで実行を続けます。",
-            "antigravityTitle": "Antigravity Usage",
-            "antigravityDescription": "Show Antigravity subscription usage in the status bar."
+            "aa6f637237": "Antigravity Usage",
+            "69e81045ec": "Show Antigravity subscription usage in the status bar."
           }
         },
         "auto": {

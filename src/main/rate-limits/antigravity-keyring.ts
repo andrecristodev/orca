@@ -23,6 +23,11 @@ type KeyringToken = {
 
 type KeyringBlob = KeyringToken & { token?: KeyringToken }
 
+/**
+ * Normalize an expiry value to a Unix-ms timestamp. Accepts an ISO-8601 string
+ * (agy's format), epoch seconds, or epoch milliseconds; returns null when the
+ * value is missing or unparseable.
+ */
 function toMillis(value: unknown): number | null {
   if (typeof value === 'number' && Number.isFinite(value)) {
     // Heuristic: seconds vs milliseconds (agy stores ISO strings, but be safe).
@@ -35,6 +40,11 @@ function toMillis(value: unknown): number | null {
   return null
 }
 
+/**
+ * Parse a raw keyring blob into the `GeminiCredentials` shape. Tolerates both
+ * agy's nested `{ token: { … } }` layout and a flat token object; returns null
+ * when the blob is not JSON or lacks a usable access token / expiry.
+ */
 function normalize(raw: string): GeminiCredentials | null {
   let parsed: KeyringBlob
   try {
@@ -53,9 +63,13 @@ function normalize(raw: string): GeminiCredentials | null {
   return { access_token: accessToken, refresh_token: refreshToken, expiry_date: expiryDate }
 }
 
-// Why: pass the CredRead P/Invoke script via -EncodedCommand (UTF-16LE base64)
-// so the embedded C# and quotes survive shell parsing intact. Mirrors the
-// established `execFileSync('powershell', ...)` pattern in browser-cookie-import.
+/**
+ * Read the `gemini:antigravity` Generic credential from the Windows Credential
+ * Manager and return its raw JSON blob (or null when absent). The CredRead
+ * P/Invoke script is passed via -EncodedCommand (UTF-16LE base64) so the
+ * embedded C# and quotes survive shell parsing intact — mirroring the
+ * established `execFileSync('powershell', …)` pattern in browser-cookie-import.
+ */
 function readWindowsCredential(): string | null {
   const script = `
 $ErrorActionPreference = 'Stop'
@@ -99,8 +113,12 @@ Write-Output $text
   return out.trim() || null
 }
 
+/**
+ * Read the agy token from the macOS Keychain (best-effort). Assumes a generic
+ * password stored under the same `gemini` / `antigravity` identifiers; returns
+ * its raw blob or null.
+ */
 function readMacCredential(): string | null {
-  // Best-effort: agy stores a generic password under the same identifiers.
   const out = execFileSync(
     'security',
     ['find-generic-password', '-s', KEYRING_SERVICE, '-a', KEYRING_ACCOUNT, '-w'],
@@ -109,8 +127,12 @@ function readMacCredential(): string | null {
   return out.trim() || null
 }
 
+/**
+ * Read the agy token from the Linux libsecret keyring (best-effort) via
+ * `secret-tool`, matching the same service/account attributes; returns its raw
+ * blob or null.
+ */
 function readLinuxCredential(): string | null {
-  // Best-effort: libsecret lookup by the same service/account attributes.
   const out = execFileSync(
     'secret-tool',
     ['lookup', 'service', KEYRING_SERVICE, 'account', KEYRING_ACCOUNT],

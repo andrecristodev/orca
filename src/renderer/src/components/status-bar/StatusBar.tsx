@@ -2012,7 +2012,7 @@ function StatusBarInner({ floatingTerminalOpen }: StatusBarProps): React.JSX.Ele
                 compact={compact}
                 iconOnly={iconOnly}
                 ariaLabel={translate(
-                  'auto.components.status.bar.StatusBar.a9f1c3b2e7',
+                  'auto.components.status.bar.StatusBar.97d40905ff',
                   'Open Antigravity usage details'
                 )}
               />
@@ -2179,7 +2179,7 @@ function StatusBarInner({ floatingTerminalOpen }: StatusBarProps): React.JSX.Ele
               }}
             >
               <AgentIcon agent="antigravity" size={14} />
-              {translate('auto.components.status.bar.StatusBar.b7e2a4c9d1', 'Antigravity Usage')}
+              {translate('auto.components.status.bar.StatusBar.fc54bb062c', 'Antigravity Usage')}
             </DropdownMenuCheckboxItem>
           )}
           <DropdownMenuCheckboxItem

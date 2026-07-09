@@ -2975,8 +2975,8 @@
             "c0e972d726": "Cancel",
             "06741a2f3d": "Open MiniMax usage details",
             "3bbf140864": "MiniMax Usage",
-            "a9f1c3b2e7": "Open Antigravity usage details",
-            "b7e2a4c9d1": "Antigravity Usage"
+            "97d40905ff": "Open Antigravity usage details",
+            "fc54bb062c": "Antigravity Usage"
           },
           "StatusBarUsageEmptyCta": {
             "828c764a79": "Connect an account",
@@ -7124,8 +7124,8 @@
               "workspaceOptions": "workspace options",
               "detailed": "detailed"
             },
-            "antigravityTitle": "Antigravity Usage",
-            "antigravityDescription": "Show Antigravity subscription usage in the status bar."
+            "aa6f637237": "Antigravity Usage",
+            "69e81045ec": "Show Antigravity subscription usage in the status bar."
           }
         },
         "auto": {
