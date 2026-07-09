@@ -2572,6 +2572,7 @@ function createNotificationsApi(): NonNullable<Partial<PreloadApi>['notification
   }
 }
 
+/** Web/mobile no-op stub of the rateLimits preload API (no local providers there). */
 function createRateLimitsApi(): NonNullable<Partial<PreloadApi>['rateLimits']> {
   const empty: RateLimitState = {
     claude: null,

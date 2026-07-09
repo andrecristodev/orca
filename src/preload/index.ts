@@ -3844,12 +3844,16 @@ const api = {
     fetchInactiveCodexAccounts: (): Promise<void> =>
       ipcRenderer.invoke('rateLimits:fetchInactiveCodexAccounts'),
     refreshMiniMax: (): Promise<RateLimitState> => ipcRenderer.invoke('rateLimits:refreshMiniMax'),
+    /** Switch the active Antigravity account by id. */
     selectAntigravityAccount: (id: string): Promise<void> =>
       ipcRenderer.invoke('rateLimits:selectAntigravityAccount', id),
+    /** Capture the account agy is currently signed into as a stored account. */
     addCurrentAntigravityAccount: (): Promise<{ ok: boolean; email: string | null }> =>
       ipcRenderer.invoke('rateLimits:addCurrentAntigravityAccount'),
+    /** Remove a stored Antigravity account by id. */
     removeAntigravityAccount: (id: string): Promise<void> =>
       ipcRenderer.invoke('rateLimits:removeAntigravityAccount', id),
+    /** Capture the current agy account and refresh the switcher (on popover open). */
     refreshAntigravityAccounts: (): Promise<void> =>
       ipcRenderer.invoke('rateLimits:refreshAntigravityAccounts'),
     onUpdate: (callback: (state: RateLimitState) => void): (() => void) => {

@@ -47,7 +47,8 @@ import type {
   ProviderRateLimits,
   RateLimitRuntimeTarget,
   RateLimitWindow,
-  InactiveAccountUsage
+  InactiveAccountUsage,
+  AntigravityAccountSummary
 } from '../../../../shared/rate-limit-types'
 import {
   ProviderIcon,
@@ -1045,6 +1046,11 @@ function WindowLabel({ w, label }: { w: RateLimitWindow; label: string }): React
 // the rest (Flash Lite, experimental) are secondary and would clutter the bar.
 const STATUS_BAR_BUCKET_NAMES = new Set(['Flash', 'Pro', '1.5 Pro'])
 
+/**
+ * Render a provider's compact status-bar segment: idle/fetching/unavailable/error
+ * placeholders, a bucket-name list for bucket providers (except Antigravity), or
+ * a MiniBar + windowed percentage for session/window providers.
+ */
 function ProviderSegment({
   p,
   compact
@@ -1654,6 +1660,7 @@ export function AntigravityAccountSwitcher(): React.JSX.Element {
   const [busy, setBusy] = useState(false)
   const [manageMode, setManageMode] = useState(false)
 
+  /** Index inactive-account usage snapshots by account id for quick row lookup. */
   const inactiveById = useMemo(() => {
     const map = new Map<string, InactiveAccountUsage>()
     for (const entry of inactive) {
@@ -1662,6 +1669,7 @@ export function AntigravityAccountSwitcher(): React.JSX.Element {
     return map
   }, [inactive])
 
+  /** Run an account action behind a busy guard, logging (never throwing) on failure. */
   const run = useCallback(async (action: () => Promise<unknown>) => {
     setBusy(true)
     try {
@@ -1680,6 +1688,24 @@ export function AntigravityAccountSwitcher(): React.JSX.Element {
   // and opening this menu surfaces it immediately, without waiting for the poll.
   useEffect(() => {
     void window.api.rateLimits.refreshAntigravityAccounts().catch(() => {})
+  }, [])
+
+  /** Handle a click on an account row: remove it in manage mode, else switch to it. */
+  const handleAccountAction = useCallback(
+    (account: AntigravityAccountSummary) => {
+      if (manageMode) {
+        void run(() => window.api.rateLimits.removeAntigravityAccount(account.id))
+      } else if (!account.isActive) {
+        void run(() => window.api.rateLimits.selectAntigravityAccount(account.id))
+      }
+    },
+    [manageMode, run]
+  )
+
+  /** Toggle the switcher between switch mode and remove/manage mode. */
+  const toggleManageMode = useCallback((event: Event) => {
+    event.preventDefault()
+    setManageMode((value) => !value)
   }, [])
 
   return (
@@ -1703,11 +1729,7 @@ export function AntigravityAccountSwitcher(): React.JSX.Element {
             disabled={busy || (!manageMode && account.isActive)}
             onSelect={(event) => {
               event.preventDefault()
-              if (manageMode) {
-                void run(() => window.api.rateLimits.removeAntigravityAccount(account.id))
-              } else if (!account.isActive) {
-                void run(() => window.api.rateLimits.selectAntigravityAccount(account.id))
-              }
+              handleAccountAction(account)
             }}
           >
             <div className="flex w-full flex-col gap-0.5">
@@ -1734,13 +1756,7 @@ export function AntigravityAccountSwitcher(): React.JSX.Element {
       {accounts.length > 0 ? (
         <>
           <DropdownMenuSeparator />
-          <DropdownMenuItem
-            disabled={busy}
-            onSelect={(event) => {
-              event.preventDefault()
-              setManageMode((value) => !value)
-            }}
-          >
+          <DropdownMenuItem disabled={busy} onSelect={toggleManageMode}>
             <Trash2 size={12} className="text-muted-foreground" />
             {manageMode
               ? translate('auto.components.status.bar.StatusBar.137d65696b', 'Done')
