@@ -7,8 +7,10 @@ import type { GeminiCredentials } from './gemini-oauth-sources'
 // and Linux use the platform keyring with the same identifiers. This module
 // reads that entry read-only and normalizes it to the same shape the file path
 // returns, so the Antigravity usage fetcher works for real `agy` users who
-// never run the Gemini CLI. We never write or refresh the keyring entry — the
-// `agy` CLI owns its lifecycle.
+// never run the Gemini CLI. Background usage polling only ever READS this entry;
+// the one exception is an explicit user-initiated account switch, which writes
+// the selected account's token back (Windows only) so `agy` itself uses the
+// switched account on its next launch.
 const KEYRING_SERVICE = 'gemini'
 const KEYRING_ACCOUNT = 'antigravity'
 const WINDOWS_TARGET = `${KEYRING_SERVICE}:${KEYRING_ACCOUNT}`
@@ -162,5 +164,77 @@ export function readAntigravityKeyringCredentials(): GeminiCredentials | null {
   } catch {
     // Missing entry (CredRead miss / non-zero exit) or no keyring tool present.
     return null
+  }
+}
+
+/**
+ * Write the given credentials back into the Windows Credential Manager
+ * `gemini:antigravity` entry in `agy`'s native blob shape, so switching the
+ * active account in Orca also switches which account `agy` uses on next launch.
+ * Windows-only and explicit (never called from background polling); returns
+ * false on non-Windows or any failure, in which case Orca still switches the
+ * account it *displays* via its own account store.
+ */
+export function writeAntigravityKeyringCredentials(creds: GeminiCredentials): boolean {
+  if (process.platform !== 'win32') {
+    return false
+  }
+  const blob = JSON.stringify({
+    token: {
+      access_token: creds.access_token,
+      token_type: 'Bearer',
+      refresh_token: creds.refresh_token,
+      expiry: new Date(creds.expiry_date).toISOString()
+    },
+    auth_method: 'consumer'
+  })
+  // Why: pass the blob as base64 on stdin so no secret ever lands on the command
+  // line, and let PowerShell CredWrite the Generic credential (LocalMachine
+  // persistence, UserName 'antigravity') that agy reads back.
+  const script = `
+$ErrorActionPreference = 'Stop'
+Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+public class OrcaAntigravityCredWrite {
+  [StructLayout(LayoutKind.Sequential, CharSet=CharSet.Unicode)]
+  public struct CREDENTIAL {
+    public int Flags; public int Type; public string TargetName; public string Comment;
+    public long LastWritten; public int CredentialBlobSize; public IntPtr CredentialBlob;
+    public int Persist; public int AttributeCount; public IntPtr Attributes;
+    public string TargetAlias; public string UserName;
+  }
+  [DllImport("advapi32.dll", CharSet=CharSet.Unicode, SetLastError=true)]
+  public static extern bool CredWrite(ref CREDENTIAL cred, int flags);
+  public static bool Write(string target, string user, byte[] blob) {
+    var c = new CREDENTIAL();
+    c.Type = 1; c.TargetName = target; c.UserName = user; c.Persist = 2;
+    c.CredentialBlobSize = blob.Length;
+    c.CredentialBlob = Marshal.AllocHGlobal(blob.Length);
+    Marshal.Copy(blob, 0, c.CredentialBlob, blob.Length);
+    try { return CredWrite(ref c, 0); }
+    finally { Marshal.FreeHGlobal(c.CredentialBlob); }
+  }
+}
+'@
+$blob = [System.Text.Encoding]::UTF8.GetBytes([System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String([Console]::In.ReadLine())))
+$ok = [OrcaAntigravityCredWrite]::Write('${WINDOWS_TARGET}', '${KEYRING_ACCOUNT}', $blob)
+if (-not $ok) { exit 1 }
+Write-Output 'ok'
+`
+  try {
+    const encoded = Buffer.from(script, 'utf16le').toString('base64')
+    const out = execFileSync(
+      'powershell',
+      ['-NoProfile', '-NonInteractive', '-EncodedCommand', encoded],
+      {
+        encoding: 'utf-8',
+        timeout: CMD_TIMEOUT_MS,
+        input: Buffer.from(blob, 'utf-8').toString('base64')
+      }
+    )
+    return out.trim() === 'ok'
+  } catch {
+    return false
   }
 }

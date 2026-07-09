@@ -45,7 +45,8 @@ import type {
 import type {
   ProviderRateLimits,
   RateLimitRuntimeTarget,
-  RateLimitWindow
+  RateLimitWindow,
+  InactiveAccountUsage
 } from '../../../../shared/rate-limit-types'
 import {
   ProviderIcon,
@@ -1096,7 +1097,10 @@ function ProviderSegment({
   // Has data (ok, fetching with stale data, or error with stale data)
   const isStale = p.status === 'error'
 
-  if (p.buckets && p.buckets.length > 0) {
+  // Why: Antigravity keeps per-model buckets for the popover detail, but its
+  // status-bar segment mirrors the session-window providers (Claude/Codex) — a
+  // MiniBar plus "{left}% {window}" — rather than the Gemini-style bucket names.
+  if (p.buckets && p.buckets.length > 0 && provider !== 'antigravity') {
     const visibleBuckets = p.buckets.filter((b) => STATUS_BAR_BUCKET_NAMES.has(b.name))
     return (
       <span className="inline-flex items-center gap-1.5">
@@ -1636,6 +1640,90 @@ function CodexSwitcherMenu({
   )
 }
 
+/**
+ * Account switcher rendered inside the Antigravity usage popover. Lists the
+ * stored Google accounts with per-account usage, lets the user switch the
+ * active account (which also re-points `agy` on Windows), and capture the
+ * account `agy` is currently signed into.
+ */
+export function AntigravityAccountSwitcher(): React.JSX.Element {
+  const accounts = useAppStore((s) => s.rateLimits.antigravityAccounts)
+  const inactive = useAppStore((s) => s.rateLimits.inactiveAntigravityAccounts)
+  const activeUsage = useAppStore((s) => s.rateLimits.antigravity)
+  const [busy, setBusy] = useState(false)
+
+  const inactiveById = useMemo(() => {
+    const map = new Map<string, InactiveAccountUsage>()
+    for (const entry of inactive) {
+      map.set(entry.accountId, entry)
+    }
+    return map
+  }, [inactive])
+
+  const run = useCallback(async (action: () => Promise<unknown>) => {
+    setBusy(true)
+    try {
+      await action()
+    } finally {
+      setBusy(false)
+    }
+  }, [])
+
+  return (
+    <div>
+      {accounts.length > 0 ? (
+        <div className="px-2 py-1 text-[10px] font-medium uppercase text-muted-foreground">
+          {translate('auto.components.status.bar.StatusBar.a051e38c9a', 'Accounts')}
+        </div>
+      ) : null}
+      {accounts.map((account) => {
+        const inactiveUsage = inactiveById.get(account.id)
+        // The active account's usage is the main meter state; inactive accounts
+        // carry their own per-account snapshot.
+        const usageLimits = account.isActive ? activeUsage : (inactiveUsage?.rateLimits ?? null)
+        const isFetching = account.isActive
+          ? activeUsage?.status === 'fetching'
+          : Boolean(inactiveUsage?.isFetching)
+        return (
+          <DropdownMenuItem
+            key={account.id}
+            disabled={busy || account.isActive}
+            onSelect={(event) => {
+              event.preventDefault()
+              if (!account.isActive) {
+                void run(() => window.api.rateLimits.selectAntigravityAccount(account.id))
+              }
+            }}
+          >
+            <div className="flex w-full flex-col gap-0.5">
+              <div className="flex min-w-0 items-center gap-2">
+                <AgentIcon agent="antigravity" size={12} />
+                <span className="min-w-0 flex-1 truncate">{account.email}</span>
+                {account.isActive ? (
+                  <span className="shrink-0 text-[10px] font-medium text-muted-foreground">
+                    {translate('auto.components.status.bar.StatusBar.ff0fbe9311', 'Active')}
+                  </span>
+                ) : null}
+              </div>
+              {usageLimits ? (
+                <InlineUsageBars limits={usageLimits} isFetching={isFetching} />
+              ) : isFetching ? (
+                <InlineUsageSkeleton />
+              ) : null}
+            </div>
+          </DropdownMenuItem>
+        )
+      })}
+      <div className="px-2 py-1 text-[10px] leading-4 text-muted-foreground">
+        {translate(
+          'auto.components.status.bar.StatusBar.1298e2427b',
+          'Sign in to another Google account in agy to add it here.'
+        )}
+      </div>
+    </div>
+  )
+}
+
 export function ProviderDetailsMenu({
   provider,
   compact,
@@ -2015,7 +2103,9 @@ function StatusBarInner({ floatingTerminalOpen }: StatusBarProps): React.JSX.Ele
                   'auto.components.status.bar.StatusBar.97d40905ff',
                   'Open Antigravity usage details'
                 )}
-              />
+              >
+                <AntigravityAccountSwitcher />
+              </ProviderDetailsMenu>
             )}
           </>
         )}

@@ -2976,7 +2976,9 @@
             "06741a2f3d": "MiniMax 사용량 세부 정보 열기",
             "3bbf140864": "MiniMax 사용량",
             "97d40905ff": "Open Antigravity usage details",
-            "fc54bb062c": "Antigravity Usage"
+            "fc54bb062c": "Antigravity Usage",
+            "a051e38c9a": "Accounts",
+            "1298e2427b": "Sign in to another Google account in agy to add it here."
           },
           "StatusBarUsageEmptyCta": {
             "828c764a79": "계정 연결",

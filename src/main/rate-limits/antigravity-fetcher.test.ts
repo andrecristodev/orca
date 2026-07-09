@@ -131,6 +131,38 @@ describe('fetchAntigravityRateLimits', () => {
     expect(result.session?.resetsAt).toBe(new Date('2026-07-10T08:00:00Z').getTime())
   })
 
+  it('groups models into Gemini and Claude/GPT families and drops internal buckets', async () => {
+    oauthState.credentials = freshCredentials()
+    routeByUrl({
+      models: jsonResponse({
+        models: {
+          'gemini-2.5-pro': {
+            quotaInfo: { remainingFraction: 0.2, resetTime: '2026-07-10T08:00:00Z' }
+          },
+          'gemini-2.5-flash': {
+            quotaInfo: { remainingFraction: 0.9, resetTime: '2026-07-10T08:00:00Z' }
+          },
+          'claude-sonnet-4-6': {
+            quotaInfo: { remainingFraction: 0.5, resetTime: '2026-07-10T09:00:00Z' }
+          },
+          'gpt-oss-120b': {
+            quotaInfo: { remainingFraction: 0.7, resetTime: '2026-07-10T09:00:00Z' }
+          },
+          tab_flash_lite_preview: {
+            quotaInfo: { remainingFraction: 1, resetTime: '2026-07-10T08:00:00Z' }
+          },
+          chat_20706: { quotaInfo: { remainingFraction: 1, resetTime: '2026-07-10T08:00:00Z' } }
+        }
+      })
+    })
+    const result = await fetchAntigravityRateLimits()
+    expect(result.status).toBe('ok')
+    // Two families; internal buckets dropped.
+    expect(result.buckets?.map((b) => b.name)).toEqual(['Gemini Models', 'Claude and GPT models'])
+    // Each family shows its most-constrained model: Gemini pro 80%, Claude/GPT 50%.
+    expect(result.buckets?.map((b) => b.usedPercent)).toEqual([80, 50])
+  })
+
   it('falls back to retrieveUserQuota when fetchAvailableModels is empty', async () => {
     oauthState.credentials = freshCredentials()
     routeByUrl({ models: jsonResponse({ models: {} }) })

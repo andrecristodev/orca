@@ -2976,7 +2976,9 @@
             "06741a2f3d": "打开 MiniMax 使用量详情",
             "3bbf140864": "MiniMax 使用量",
             "97d40905ff": "Open Antigravity usage details",
-            "fc54bb062c": "Antigravity Usage"
+            "fc54bb062c": "Antigravity Usage",
+            "a051e38c9a": "Accounts",
+            "1298e2427b": "Sign in to another Google account in agy to add it here."
           },
           "StatusBarUsageEmptyCta": {
             "828c764a79": "连接账户",

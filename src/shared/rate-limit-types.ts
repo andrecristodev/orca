@@ -95,6 +95,13 @@ export type InactiveAccountUsage = {
   isFetching: boolean
 }
 
+/** A stored Antigravity Google account, surfaced to the status-bar switcher. */
+export type AntigravityAccountSummary = {
+  id: string
+  email: string
+  isActive: boolean
+}
+
 export type RateLimitState = {
   claude: ProviderRateLimits | null
   codex: ProviderRateLimits | null
@@ -114,4 +121,8 @@ export type RateLimitState = {
   codexTarget: RateLimitRuntimeTarget
   inactiveClaudeAccounts: InactiveAccountUsage[]
   inactiveCodexAccounts: InactiveAccountUsage[]
+  /** All stored Antigravity accounts (active + inactive) for the switcher. */
+  antigravityAccounts: AntigravityAccountSummary[]
+  /** Per-account usage for the non-active Antigravity accounts. */
+  inactiveAntigravityAccounts: InactiveAccountUsage[]
 }

@@ -24,4 +24,13 @@ export function registerRateLimitHandlers(rateLimits: RateLimitService): void {
     rateLimits.fetchInactiveCodexAccountsOnOpen()
   )
   ipcMain.handle('rateLimits:refreshMiniMax', () => rateLimits.refresh())
+  ipcMain.handle('rateLimits:selectAntigravityAccount', (_event, id: string) =>
+    rateLimits.selectAntigravityAccount(id)
+  )
+  ipcMain.handle('rateLimits:addCurrentAntigravityAccount', () =>
+    rateLimits.addCurrentAntigravityAccount()
+  )
+  ipcMain.handle('rateLimits:removeAntigravityAccount', (_event, id: string) =>
+    rateLimits.removeAntigravityAccount(id)
+  )
 }

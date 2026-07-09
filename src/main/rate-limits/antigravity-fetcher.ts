@@ -6,11 +6,7 @@ import {
   type GeminiCredentials
 } from './gemini-oauth-sources'
 import { readAntigravityKeyringCredentials } from './antigravity-keyring'
-import {
-  buildRateLimitBucket,
-  deduplicateBuckets,
-  deriveSessionSummary
-} from './gemini-bucket-formatting'
+import { buildRateLimitBucket, deriveSessionSummary } from './gemini-bucket-formatting'
 
 // Why: Antigravity (Google's agentic coding tool, CLI `agy`) authenticates the
 // same Google account the Gemini CLI uses and shares the `~/.gemini` config
@@ -24,6 +20,11 @@ import {
 // It never rewrites either source, so it can't race the Gemini provider or the
 // `agy` CLI that own them.
 const API_TIMEOUT_MS = 10_000
+// Nominal session window (5h) shown on the status-bar segment label, matching
+// the other subscription providers; the exact per-model reset is in the popover.
+const SESSION_WINDOW_MINUTES = 300
+// Internal autocomplete/chat quota buckets that are not user-facing models.
+const INTERNAL_MODEL_RE = /^(tab_|chat_)/
 const BASE_URL = 'https://cloudcode-pa.googleapis.com'
 const LOAD_CODE_ASSIST_URL = `${BASE_URL}/v1internal:loadCodeAssist`
 const FETCH_AVAILABLE_MODELS_URL = `${BASE_URL}/v1internal:fetchAvailableModels`
@@ -38,6 +39,19 @@ const ANTIGRAVITY_METADATA = {
 } as const
 
 type ModelQuota = { remainingFraction: number; resetTime: string; modelId: string }
+
+// Why: the Antigravity app groups usage into two model families; we mirror those
+// exact labels so the meter reads the same as the app's usage panel.
+type AntigravityFamily = 'gemini' | 'claude-gpt'
+const FAMILY_LABEL: Record<AntigravityFamily, string> = {
+  gemini: 'Gemini Models',
+  'claude-gpt': 'Claude and GPT models'
+}
+
+/** Classify a model id into its Antigravity display family (Gemini vs Claude/GPT). */
+function modelFamily(modelId: string): AntigravityFamily {
+  return modelId.startsWith('gemini') ? 'gemini' : 'claude-gpt'
+}
 
 /** Build an `unavailable` result — the provider is not configured (no credentials). */
 function unavailable(error: string): ProviderRateLimits {
@@ -211,20 +225,57 @@ class UnauthorizedError extends Error {
  * summarizing the most-constrained one as the session window. Empty → `error`.
  */
 function toRateLimits(quotas: ModelQuota[]): ProviderRateLimits {
-  const buckets: RateLimitBucket[] = deduplicateBuckets(
-    quotas.map((q) => ({ ...buildRateLimitBucket(q), modelId: q.modelId }))
+  // Why: mirror how the Antigravity app itself presents usage — two model
+  // families ("Gemini Models" and "Claude and GPT models"), each collapsed to a
+  // single limit — instead of ~20 near-identical per-model rows. Each family
+  // shows its most-constrained model (the binding limit). Internal
+  // autocomplete/chat buckets (`tab_*`, `chat_*`) are dropped.
+  const byFamily = new Map<AntigravityFamily, RateLimitBucket>()
+  for (const quota of quotas) {
+    if (INTERNAL_MODEL_RE.test(quota.modelId)) {
+      continue
+    }
+    const family = modelFamily(quota.modelId)
+    const bucket = buildRateLimitBucket(quota)
+    const current = byFamily.get(family)
+    // Keep the most-constrained (highest used) model as the family's limit.
+    if (!current || bucket.usedPercent > current.usedPercent) {
+      byFamily.set(family, { ...bucket, name: FAMILY_LABEL[family] })
+    }
+  }
+  const buckets: RateLimitBucket[] = [...byFamily.values()].sort(
+    (a, b) => b.usedPercent - a.usedPercent
   )
   if (buckets.length === 0) {
     return failed('Antigravity quota response did not include any model buckets')
   }
+  const session = deriveSessionSummary(buckets)
+  // Why: the per-model buckets use Gemini's nominal 1h window; the status-bar
+  // segment renders the session with a "5h" label for parity with the other
+  // subscription providers (the exact reset stays visible in the popover).
+  if (session) {
+    session.windowMinutes = SESSION_WINDOW_MINUTES
+  }
   return {
     provider: 'antigravity',
-    session: deriveSessionSummary(buckets),
+    session,
     weekly: null,
     buckets,
     updatedAt: Date.now(),
     error: null,
     status: 'ok'
+  }
+}
+
+/**
+ * Read the current Antigravity credentials from disk (Gemini CLI login) then the
+ * OS keyring (agy). Used by the account store to seed / capture accounts.
+ */
+export async function readAntigravityCredentials(): Promise<GeminiCredentials | null> {
+  try {
+    return (await readGeminiCredentials()) ?? readAntigravityKeyringCredentials()
+  } catch {
+    return null
   }
 }
 
@@ -253,13 +304,19 @@ async function resolveAccessToken(creds: GeminiCredentials): Promise<string | nu
  * OS keyring, with no readable file), resolves the Code Assist project under
  * the ANTIGRAVITY ideType, and reports Antigravity's per-model quota. Never
  * writes the credentials file.
+ *
+ * @param credsOverride when provided (multi-account mode), fetch usage for that
+ * specific account's stored credentials instead of the on-disk / keyring token.
  */
-export async function fetchAntigravityRateLimits(): Promise<ProviderRateLimits> {
+export async function fetchAntigravityRateLimits(
+  credsOverride?: GeminiCredentials | null
+): Promise<ProviderRateLimits> {
   let creds: GeminiCredentials | null
   try {
-    // File first (Gemini CLI login), then the OS keyring where `agy` stores its
-    // token — most Antigravity users only have the latter.
-    creds = (await readGeminiCredentials()) ?? readAntigravityKeyringCredentials()
+    // Prefer an explicit account's credentials; otherwise the file first
+    // (Gemini CLI login), then the OS keyring where `agy` stores its token —
+    // most Antigravity users only have the latter.
+    creds = credsOverride ?? (await readGeminiCredentials()) ?? readAntigravityKeyringCredentials()
   } catch (err) {
     return failed(err instanceof Error ? err.message : 'Unable to read Antigravity credentials')
   }

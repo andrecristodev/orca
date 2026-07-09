@@ -7,7 +7,8 @@ import type {
   CodexRateLimitResetResult,
   RateLimitState,
   ProviderRateLimits,
-  InactiveAccountUsage
+  InactiveAccountUsage,
+  AntigravityAccountSummary
 } from '../../shared/rate-limit-types'
 import { fetchClaudeRateLimits, fetchManagedAccountUsage } from './claude-fetcher'
 import type { InactiveClaudeAccountInfo } from './claude-fetcher'
@@ -21,7 +22,18 @@ import {
 } from '../claude-accounts/runtime-selection'
 import { fetchGeminiRateLimits } from './gemini-usage-fetcher'
 import { fetchKimiRateLimits } from './kimi-fetcher'
-import { fetchAntigravityRateLimits } from './antigravity-fetcher'
+import { fetchAntigravityRateLimits, readAntigravityCredentials } from './antigravity-fetcher'
+import {
+  fetchAccountEmail,
+  getAccountCredentials,
+  getActiveAccountCredentials,
+  getActiveAccountId,
+  listAccounts,
+  removeAccount,
+  setActiveAccount,
+  upsertAccount
+} from './antigravity-account-store'
+import { writeAntigravityKeyringCredentials } from './antigravity-keyring'
 import { hasMiniMaxSessionCookie } from '../minimax/minimax-cookie-store'
 import { fetchMiniMaxRateLimits } from './minimax-fetcher'
 import { fetchOpenCodeGoRateLimits } from './opencode-go-usage-fetcher'
@@ -118,6 +130,10 @@ export class RateLimitService {
   private pollInterval: number = DEFAULT_POLL_MS
   private timer: ReturnType<typeof setInterval> | null = null
   private deferredStartupRefreshTimer: ReturnType<typeof setTimeout> | null = null
+  // Antigravity multi-account: the stored account list + per-account usage for
+  // the non-active accounts, refreshed alongside the main poll cycle.
+  private antigravityAccountsSummary: AntigravityAccountSummary[] = []
+  private antigravityInactiveAccounts: InactiveAccountUsage[] = []
   private lastFetchAt = 0
   private mainWindow: BrowserWindow | null = null
   private detachWindowListeners: (() => void) | null = null
@@ -281,7 +297,9 @@ export class RateLimitService {
       inactiveCodexAccounts: this.buildInactiveArray(
         this.inactiveCodexCache,
         this.inactiveCodexFetching
-      )
+      ),
+      antigravityAccounts: this.antigravityAccountsSummary,
+      inactiveAntigravityAccounts: this.antigravityInactiveAccounts
     }
   }
 
@@ -1139,7 +1157,9 @@ export class RateLimitService {
             groupId: miniMaxGroupId,
             models: miniMaxModels
           }),
-      fetchAntigravityRateLimits()
+      // Active-account credentials when the multi-account store is set up;
+      // otherwise the fetcher falls back to the file / agy keyring token.
+      fetchAntigravityRateLimits(getActiveAccountCredentials())
     ])
 
     if (signal.aborted) {
@@ -1287,6 +1307,82 @@ export class RateLimitService {
     })
 
     this.lastFetchAt = Date.now()
+    await this.refreshAntigravityAccounts()
+  }
+
+  /**
+   * Refresh the Antigravity account switcher: seed the store from the current
+   * agy / file token when it is empty (so the signed-in account appears), then
+   * fetch per-account usage for every non-active account. Best-effort; leaves
+   * the prior summary intact on failure. Pushes updated state to the renderer.
+   */
+  private async refreshAntigravityAccounts(): Promise<void> {
+    try {
+      // Auto-follow agy: capture whichever Google account agy is currently
+      // signed into and mark it active, so logging into a new account via agy
+      // surfaces it in the switcher (and drives the main meter) without any
+      // manual step. Dedupes by email, so this also refreshes a known account's
+      // stored token each cycle.
+      const creds = await readAntigravityCredentials()
+      if (creds && creds.expiry_date >= Date.now()) {
+        const email = await fetchAccountEmail(creds.access_token)
+        if (email) {
+          upsertAccount(email, creds, true)
+        }
+      }
+      const accounts = listAccounts()
+      const activeId = getActiveAccountId()
+      const inactive = accounts.filter((a) => a.id !== activeId)
+      const inactiveUsage: InactiveAccountUsage[] = await Promise.all(
+        inactive.map(async (account) => {
+          const creds = getAccountCredentials(account.id)
+          const rateLimits = creds ? await fetchAntigravityRateLimits(creds) : null
+          return { accountId: account.id, rateLimits, updatedAt: Date.now(), isFetching: false }
+        })
+      )
+      this.antigravityAccountsSummary = accounts
+      this.antigravityInactiveAccounts = inactiveUsage
+      this.pushToRenderer()
+    } catch {
+      // Best-effort: keep the last known account summary / inactive usage.
+    }
+  }
+
+  /**
+   * Switch the active Antigravity account. Updates Orca's display pointer and,
+   * on Windows, writes the selected token back to the `gemini:antigravity`
+   * keyring entry so `agy` itself uses the account on next launch. Re-fetches.
+   */
+  async selectAntigravityAccount(id: string): Promise<void> {
+    if (!setActiveAccount(id)) {
+      return
+    }
+    const creds = getAccountCredentials(id)
+    if (creds) {
+      writeAntigravityKeyringCredentials(creds)
+    }
+    await this.refresh()
+  }
+
+  /** Capture the account `agy` is currently signed into as a stored account. */
+  async addCurrentAntigravityAccount(): Promise<{ ok: boolean; email: string | null }> {
+    const creds = await readAntigravityCredentials()
+    if (!creds || creds.expiry_date < Date.now()) {
+      return { ok: false, email: null }
+    }
+    const email = await fetchAccountEmail(creds.access_token)
+    if (!email) {
+      return { ok: false, email: null }
+    }
+    upsertAccount(email, creds, true)
+    await this.refresh()
+    return { ok: true, email }
+  }
+
+  /** Remove a stored Antigravity account and re-fetch. */
+  async removeAntigravityAccount(id: string): Promise<void> {
+    removeAccount(id)
+    await this.refresh()
   }
 
   private async runFetchCodexOnlyCycle(signal: AbortSignal): Promise<void> {

@@ -19,7 +19,9 @@ describe('RateLimitState', () => {
       claudeTarget: { runtime: 'host', wslDistro: null },
       codexTarget: { runtime: 'host', wslDistro: null },
       inactiveClaudeAccounts: [],
-      inactiveCodexAccounts: []
+      inactiveCodexAccounts: [],
+      antigravityAccounts: [],
+      inactiveAntigravityAccounts: []
     }
 
     expect(state.minimax).toBeNull()
