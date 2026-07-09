@@ -1330,6 +1330,19 @@ export class RateLimitService {
           upsertAccount(email, creds, true)
         }
       }
+    } catch {
+      // Best-effort capture; still rebuild the switcher below.
+    }
+    await this.rebuildAntigravityAccountsState()
+  }
+
+  /**
+   * Rebuild the account summary + per-account usage from the store and push it,
+   * WITHOUT capturing the current agy account. Used after an explicit removal so
+   * a removed account is not immediately re-added by the auto-follow capture.
+   */
+  private async rebuildAntigravityAccountsState(): Promise<void> {
+    try {
       const accounts = listAccounts()
       const activeId = getActiveAccountId()
       const inactive = accounts.filter((a) => a.id !== activeId)
@@ -1379,10 +1392,15 @@ export class RateLimitService {
     return { ok: true, email }
   }
 
-  /** Remove a stored Antigravity account and re-fetch. */
+  /**
+   * Remove a stored Antigravity account. Rebuilds the switcher WITHOUT the
+   * auto-follow capture, so a removed account is not immediately re-added; the
+   * account agy is currently signed into will reappear on the next capture
+   * (poll/open) until the user also signs out of it in agy.
+   */
   async removeAntigravityAccount(id: string): Promise<void> {
     removeAccount(id)
-    await this.refresh()
+    await this.rebuildAntigravityAccountsState()
   }
 
   /**

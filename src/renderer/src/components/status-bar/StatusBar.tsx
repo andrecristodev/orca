@@ -11,7 +11,8 @@ import {
   Loader2,
   PanelsTopLeft,
   RefreshCw,
-  Server
+  Server,
+  Trash2
 } from 'lucide-react'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { lazyWithRetry } from '@/lib/lazy-with-retry'
@@ -1651,6 +1652,7 @@ export function AntigravityAccountSwitcher(): React.JSX.Element {
   const inactive = useAppStore((s) => s.rateLimits.inactiveAntigravityAccounts)
   const activeUsage = useAppStore((s) => s.rateLimits.antigravity)
   const [busy, setBusy] = useState(false)
+  const [manageMode, setManageMode] = useState(false)
 
   const inactiveById = useMemo(() => {
     const map = new Map<string, InactiveAccountUsage>()
@@ -1698,10 +1700,12 @@ export function AntigravityAccountSwitcher(): React.JSX.Element {
         return (
           <DropdownMenuItem
             key={account.id}
-            disabled={busy || account.isActive}
+            disabled={busy || (!manageMode && account.isActive)}
             onSelect={(event) => {
               event.preventDefault()
-              if (!account.isActive) {
+              if (manageMode) {
+                void run(() => window.api.rateLimits.removeAntigravityAccount(account.id))
+              } else if (!account.isActive) {
                 void run(() => window.api.rateLimits.selectAntigravityAccount(account.id))
               }
             }}
@@ -1710,27 +1714,55 @@ export function AntigravityAccountSwitcher(): React.JSX.Element {
               <div className="flex min-w-0 items-center gap-2">
                 <AgentIcon agent="antigravity" size={12} />
                 <span className="min-w-0 flex-1 truncate">{account.email}</span>
-                {account.isActive ? (
+                {manageMode ? (
+                  <Trash2 size={12} className="shrink-0 text-muted-foreground" />
+                ) : account.isActive ? (
                   <span className="shrink-0 text-[10px] font-medium text-muted-foreground">
                     {translate('auto.components.status.bar.StatusBar.ff0fbe9311', 'Active')}
                   </span>
                 ) : null}
               </div>
-              {usageLimits ? (
+              {!manageMode && usageLimits ? (
                 <InlineUsageBars limits={usageLimits} isFetching={isFetching} />
-              ) : isFetching ? (
+              ) : !manageMode && isFetching ? (
                 <InlineUsageSkeleton />
               ) : null}
             </div>
           </DropdownMenuItem>
         )
       })}
-      <div className="px-2 py-1 text-[10px] leading-4 text-muted-foreground">
-        {translate(
-          'auto.components.status.bar.StatusBar.1298e2427b',
-          'Sign in to another Google account in agy to add it here.'
-        )}
-      </div>
+      {accounts.length > 0 ? (
+        <>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            disabled={busy}
+            onSelect={(event) => {
+              event.preventDefault()
+              setManageMode((value) => !value)
+            }}
+          >
+            <Trash2 size={12} className="text-muted-foreground" />
+            {manageMode
+              ? translate('auto.components.status.bar.StatusBar.137d65696b', 'Done')
+              : translate('auto.components.status.bar.StatusBar.87a19bd15f', 'Manage accounts')}
+          </DropdownMenuItem>
+        </>
+      ) : null}
+      {manageMode ? (
+        <div className="px-2 py-1 text-[10px] leading-4 text-muted-foreground">
+          {translate(
+            'auto.components.status.bar.StatusBar.73759b7e83',
+            'Removing an account only removes it from Orca; sign out in agy to fully disconnect it.'
+          )}
+        </div>
+      ) : (
+        <div className="px-2 py-1 text-[10px] leading-4 text-muted-foreground">
+          {translate(
+            'auto.components.status.bar.StatusBar.1298e2427b',
+            'Sign in to another Google account in agy to add it here.'
+          )}
+        </div>
+      )}
     </div>
   )
 }

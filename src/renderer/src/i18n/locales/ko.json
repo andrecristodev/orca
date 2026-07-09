@@ -2978,7 +2978,10 @@
             "97d40905ff": "Open Antigravity usage details",
             "fc54bb062c": "Antigravity Usage",
             "a051e38c9a": "Accounts",
-            "1298e2427b": "Sign in to another Google account in agy to add it here."
+            "1298e2427b": "Sign in to another Google account in agy to add it here.",
+            "137d65696b": "Done",
+            "87a19bd15f": "Manage accounts",
+            "73759b7e83": "Removing an account only removes it from Orca; sign out in agy to fully disconnect it."
           },
           "StatusBarUsageEmptyCta": {
             "828c764a79": "계정 연결",
