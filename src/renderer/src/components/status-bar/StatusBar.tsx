@@ -1664,6 +1664,10 @@ export function AntigravityAccountSwitcher(): React.JSX.Element {
     setBusy(true)
     try {
       await action()
+    } catch (err) {
+      // Why: called via `void run(...)`, so an unhandled rejection here (e.g. a
+      // failed keyring write on switch) would be lost — log it and reset busy.
+      console.error('Antigravity account action failed', err)
     } finally {
       setBusy(false)
     }

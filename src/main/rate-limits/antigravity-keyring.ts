@@ -179,15 +179,6 @@ export function writeAntigravityKeyringCredentials(creds: GeminiCredentials): bo
   if (process.platform !== 'win32') {
     return false
   }
-  const blob = JSON.stringify({
-    token: {
-      access_token: creds.access_token,
-      token_type: 'Bearer',
-      refresh_token: creds.refresh_token,
-      expiry: new Date(creds.expiry_date).toISOString()
-    },
-    auth_method: 'consumer'
-  })
   // Why: pass the blob as base64 on stdin so no secret ever lands on the command
   // line, and let PowerShell CredWrite the Generic credential (LocalMachine
   // persistence, UserName 'antigravity') that agy reads back.
@@ -223,6 +214,17 @@ if (-not $ok) { exit 1 }
 Write-Output 'ok'
 `
   try {
+    // Inside the try: a bad (e.g. NaN) expiry_date makes toISOString() throw,
+    // which must resolve to `false`, not escape this function.
+    const blob = JSON.stringify({
+      token: {
+        access_token: creds.access_token,
+        token_type: 'Bearer',
+        refresh_token: creds.refresh_token,
+        expiry: new Date(creds.expiry_date).toISOString()
+      },
+      auth_method: 'consumer'
+    })
     const encoded = Buffer.from(script, 'utf16le').toString('base64')
     const out = execFileSync(
       'powershell',

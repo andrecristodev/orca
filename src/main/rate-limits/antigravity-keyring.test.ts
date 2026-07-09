@@ -6,7 +6,10 @@ vi.mock('node:child_process', () => ({
   execFileSync: execFileSyncMock
 }))
 
-import { readAntigravityKeyringCredentials } from './antigravity-keyring'
+import {
+  readAntigravityKeyringCredentials,
+  writeAntigravityKeyringCredentials
+} from './antigravity-keyring'
 
 const originalPlatform = process.platform
 
@@ -89,6 +92,22 @@ describe('readAntigravityKeyringCredentials', () => {
   it('returns null on unsupported platforms without invoking a shell', () => {
     setPlatform('freebsd' as NodeJS.Platform)
     expect(readAntigravityKeyringCredentials()).toBeNull()
+    expect(execFileSyncMock).not.toHaveBeenCalled()
+  })
+
+  it('write returns false (never throws) on a bad expiry_date', () => {
+    setPlatform('win32')
+    const creds = { access_token: 'a', refresh_token: 'r', expiry_date: Number.NaN }
+    // A NaN expiry makes toISOString() throw; it must resolve to false, and the
+    // failure must be caught before any shell-out.
+    expect(writeAntigravityKeyringCredentials(creds)).toBe(false)
+    expect(execFileSyncMock).not.toHaveBeenCalled()
+  })
+
+  it('write returns false on non-Windows platforms without a shell-out', () => {
+    setPlatform('darwin')
+    const creds = { access_token: 'a', refresh_token: 'r', expiry_date: Date.now() }
+    expect(writeAntigravityKeyringCredentials(creds)).toBe(false)
     expect(execFileSyncMock).not.toHaveBeenCalled()
   })
 })
