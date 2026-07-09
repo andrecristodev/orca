@@ -33,4 +33,7 @@ export function registerRateLimitHandlers(rateLimits: RateLimitService): void {
   ipcMain.handle('rateLimits:removeAntigravityAccount', (_event, id: string) =>
     rateLimits.removeAntigravityAccount(id)
   )
+  ipcMain.handle('rateLimits:refreshAntigravityAccounts', () =>
+    rateLimits.refreshAntigravityAccountsOnOpen()
+  )
 }

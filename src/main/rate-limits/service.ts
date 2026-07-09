@@ -1385,6 +1385,15 @@ export class RateLimitService {
     await this.refresh()
   }
 
+  /**
+   * Capture the account `agy` is currently signed into and refresh the switcher.
+   * Called when the user opens the Antigravity popover, so signing into a new
+   * account in `agy` surfaces it immediately instead of waiting for the poll.
+   */
+  async refreshAntigravityAccountsOnOpen(): Promise<void> {
+    await this.refreshAntigravityAccounts()
+  }
+
   private async runFetchCodexOnlyCycle(signal: AbortSignal): Promise<void> {
     if (signal.aborted) {
       return

@@ -2604,6 +2604,7 @@ function createRateLimitsApi(): NonNullable<Partial<PreloadApi>['rateLimits']> {
     selectAntigravityAccount: () => Promise.resolve(),
     addCurrentAntigravityAccount: () => Promise.resolve({ ok: false, email: null }),
     removeAntigravityAccount: () => Promise.resolve(),
+    refreshAntigravityAccounts: () => Promise.resolve(),
     onUpdate: () => noopUnsubscribe
   }
 }

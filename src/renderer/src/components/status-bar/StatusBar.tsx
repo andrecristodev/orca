@@ -1673,6 +1673,13 @@ export function AntigravityAccountSwitcher(): React.JSX.Element {
     }
   }, [])
 
+  // Why: this component mounts when the popover opens, so capture the account
+  // agy is currently signed into right then — signing into a new account in agy
+  // and opening this menu surfaces it immediately, without waiting for the poll.
+  useEffect(() => {
+    void window.api.rateLimits.refreshAntigravityAccounts().catch(() => {})
+  }, [])
+
   return (
     <div>
       {accounts.length > 0 ? (
